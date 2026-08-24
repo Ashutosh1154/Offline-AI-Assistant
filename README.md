@@ -45,6 +45,19 @@ Embedding generation and vector search.
 OCR support for scanned PDFs.
 Multi-document support and chat history.
 
+<<<<<<< HEAD
 **Project Status**
+=======
+### Day 3 — FastAPI PDF Upload & Document Processing
+
+- Tested the FastAPI application using Uvicorn and Swagger UI.
+- Verified API endpoints for application health and document handling.
+- Implemented PDF upload functionality using FastAPI `UploadFile`.
+- Successfully processed uploaded PDF documents using PyMuPDF (`fitz`).
+- Extracted textual content from PDF pages and stored the processed document data for further AI processing.
+- Validated the complete PDF upload and text extraction pipeline through the FastAPI interface.
+
+Project Status
+>>>>>>> 133dd0f (Day 3: Completed PDF upload and text extraction pipeline)
 
 Currently under active development.

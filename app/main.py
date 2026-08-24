@@ -2,7 +2,7 @@ from fastapi import FastAPI, UploadFile, File
 from app.schemas import QuestionRequest
 import shutil
 from pathlib import Path
-from src.document_loader import load_pdf
+from src.document_loader import load_pdf, save_text
 
 app = FastAPI()
 
@@ -33,7 +33,9 @@ def upload_document(file: UploadFile = File(...)):
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    document_text = load_pdf(str(file_path))
+    document_text = load_pdf(file_path)
+
+    save_text(file_path.stem, document_text)    #Saving the extracted text
 
     return {
         "message": "File uploaded and processed successfully",
