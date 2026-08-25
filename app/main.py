@@ -3,6 +3,9 @@ from app.schemas import QuestionRequest
 import shutil
 from pathlib import Path
 from src.document_loader import load_pdf, save_text
+from ollama import chat
+
+MODEL_NAME= "qwen3:4b"
 
 app = FastAPI()
 
@@ -41,4 +44,45 @@ def upload_document(file: UploadFile = File(...)):
         "message": "File uploaded and processed successfully",
         "filename": file.filename,
         "text_length": len(document_text)
+    }
+
+    # creating the ask endpoint
+
+@app.post("/ask")
+def ask_question(request:QuestionRequest):
+    processed_directory = Path("data/processed")
+    processed_files = sorted(processed_directory.glob("*.txt"))
+
+    if not processed_files:
+            return {
+        "error": "No processed document found. Please upload a PDF first."
+    }
+
+    processed_file = processed_files[-1]
+    with open(processed_file, "r", encoding="utf-8") as file:
+            document_text=file.read()
+
+    prompt= f"""
+        You are an AI Assistant
+        Answer the user's questions using the information from the document below.
+        Document:
+        {document_text}
+
+        Question:
+        {request.question}
+        """
+
+    response= chat(
+            model=MODEL_NAME,
+            messages=[
+                {
+                    "role":"user",
+                    "content":prompt
+                }
+            ]
+        )
+
+    return {
+        "question": request.question,
+        "answer":response.message.content
     }

@@ -57,7 +57,16 @@ Multi-document support and chat history.
 - Extracted textual content from PDF pages and stored the processed document data for further AI processing.
 - Validated the complete PDF upload and text extraction pipeline through the FastAPI interface.
 
+### Day 4 — Document Question Answering with Ollama
+
+* Implemented the `POST /ask` endpoint using FastAPI and Pydantic request models.
+* Integrated Ollama's `chat()` API with the locally hosted Qwen3:4B model.
+* Built prompt generation by combining extracted PDF content with user questions.
+* Loaded processed document text and generated context-aware responses through the LLM.
+* Successfully tested end-to-end document question answering using FastAPI Swagger UI.
+
 Project Status
 >>>>>>> 133dd0f (Day 3: Completed PDF upload and text extraction pipeline)
 
 Currently under active development.
+
