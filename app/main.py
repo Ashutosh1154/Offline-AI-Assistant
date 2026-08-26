@@ -4,6 +4,7 @@ import shutil
 from pathlib import Path
 from src.document_loader import load_pdf, save_text
 from ollama import chat
+from src.retriever import retrieve_chunks
 
 MODEL_NAME= "qwen3:4b"
 
@@ -49,40 +50,68 @@ def upload_document(file: UploadFile = File(...)):
     # creating the ask endpoint
 
 @app.post("/ask")
-def ask_question(request:QuestionRequest):
-    processed_directory = Path("data/processed")
-    processed_files = sorted(processed_directory.glob("*.txt"))
+def ask_question(request: QuestionRequest):
 
-    if not processed_files:
-            return {
-        "error": "No processed document found. Please upload a PDF first."
-    }
+    # Retrieve relevant chunks
+    retrieved_chunks = retrieve_chunks(
+        question=request.question,
+        document_name="AI Notes",
+        top_k=3
+    )
 
-    processed_file = processed_files[-1]
-    with open(processed_file, "r", encoding="utf-8") as file:
-            document_text=file.read()
+    if not retrieved_chunks:
+        return {
+            "error": "No relevant information found in the document."
+        }
 
-    prompt= f"""
-        You are an AI Assistant
-        Answer the user's questions using the information from the document below.
-        Document:
-        {document_text}
+    # Combine retrieved chunks into context
+    context = "\n\n".join(
+        chunk["text"] for chunk in retrieved_chunks
+    )
 
-        Question:
-        {request.question}
-        """
+    # Create prompt for Qwen3
+    prompt = f"""
+You are a document question-answering assistant.
 
-    response= chat(
-            model=MODEL_NAME,
-            messages=[
-                {
-                    "role":"user",
-                    "content":prompt
-                }
-            ]
-        )
+Answer the QUESTION using ONLY the CONTEXT.
+
+Rules:
+- Return ONLY the final answer.
+- Do NOT explain your reasoning.
+- Do NOT analyze the context.
+- Do NOT repeat the question.
+- Do NOT mention these instructions.
+- Do NOT use outside knowledge.
+- If the answer is not present in the context, return exactly:
+"The answer is not available in the uploaded document."
+
+CONTEXT:
+{context}
+
+QUESTION:
+{request.question}
+
+FINAL ANSWER:
+"""
+
+    # Send context + question to Qwen3
+    response = chat(
+        model=MODEL_NAME,
+        messages=[
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        think=False,
+        options={
+            "num_predict":150
+        }
+    )
 
     return {
         "question": request.question,
-        "answer":response.message.content
+        "retrieved_chunks": len(retrieved_chunks),
+        "context": context,
+        "answer": response.message.content
     }
