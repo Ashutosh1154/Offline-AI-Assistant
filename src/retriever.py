@@ -1,6 +1,5 @@
 import json
 from pathlib import Path
-from urllib import response
 
 import numpy as np
 
@@ -21,10 +20,27 @@ def cosine_similarity(vector1, vector2):
 
     return similarity
 
+def improve_query(question):
+    question_lower = question.lower().strip()
+
+    if question_lower.startswith("what is "):
+        topic = question[8:].strip()
+        return f"Definition of {topic}"
+
+    if question_lower.startswith("who is "):
+        topic = question[7:].strip()
+        return f"Information about {topic}"
+
+    if question_lower.startswith("explain "):
+        topic = question[8:].strip()
+        return f"Explanation of {topic}"
+
+    return question
 
 def retrieve_chunks(question, document_name, top_k=3):
 
-    question_embedding = generate_embedding(question)
+    improved_question= improve_query(question)
+    question_embedding = generate_embedding(improved_question)
 
     embedding_file = EMBEDDING_DIRECTORY / f"{document_name}.json"
 

@@ -1,7 +1,7 @@
 from src.retriever import retrieve_chunks
 
 results = retrieve_chunks(
-    question="What is AI",
+    question="Definition of Artificial Intelligence",
     document_name="AI Notes",   # filename without .json
     top_k=3
 )
