@@ -18,5 +18,4 @@ data/chroma_db/
 # Environment variables (later)
 .env
 
-*.pyc
-data/embeddings/
+*.save

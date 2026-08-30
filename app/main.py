@@ -1,42 +1,53 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from app.schemas import QuestionRequest
-import shutil
 from pathlib import Path
+import shutil
+
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
 from ollama import chat
+
+from app.schemas import QuestionRequest
 from src.document_loader import save_text
 from src.ocr_service import extract_text_with_ocr
-from src.retriever import retrieve_chunks
 from src.chunking import chunk_text
 from src.embedding_service import generate_chunk_embeddings
-from src.vector_store import save_embeddings
+from src.chroma_store import save_to_chroma, list_chroma_documents
+from src.chroma_retriever import retrieve_from_chroma
 
 
 MODEL_NAME = "qwen3:4b"
 
-app = FastAPI()
+BASE_DIRECTORY = Path(__file__).resolve().parent.parent
+UPLOAD_DIRECTORY = BASE_DIRECTORY / "data" / "uploads"
+FRONTEND_DIRECTORY = BASE_DIRECTORY / "frontend"
 
+UPLOAD_DIRECTORY.mkdir(
+    parents=True,
+    exist_ok=True
+)
 
-# Upload directory
-UPLOAD_DIRECTORY = Path("data/uploads")
-UPLOAD_DIRECTORY.mkdir(parents=True, exist_ok=True)
+app = FastAPI(
+    title="Offline AI Assistant",
+    version="1.0.0"
+)
 
-
-# Embedding directory
-EMBEDDING_DIRECTORY = Path("data/embeddings")
-EMBEDDING_DIRECTORY.mkdir(parents=True, exist_ok=True)
+app.mount(
+    "/static",
+    StaticFiles(directory=str(FRONTEND_DIRECTORY)),
+    name="static"
+)
 
 
 @app.get("/")
 def home():
-
-    return {
-        "message": "Welcome Ashutosh, FASTAPI is running"
-    }
+    return FileResponse(
+        FRONTEND_DIRECTORY / "index.html"
+    )
 
 
 @app.get("/health")
 def health():
-
     return {
         "status": "running",
         "model": MODEL_NAME
@@ -44,77 +55,71 @@ def health():
 
 
 @app.post("/upload")
-def upload_document(file: UploadFile = File(...)):
+def upload_document(
+    file: UploadFile = File(...)
+):
 
-    # Check if filename exists
     if not file.filename:
         raise HTTPException(
             status_code=400,
             detail="No file was provided."
         )
 
-    # Allow only PDF files
     if not file.filename.lower().endswith(".pdf"):
         raise HTTPException(
             status_code=400,
             detail="Only PDF files are supported."
         )
 
-    # Create upload path
-    file_path = UPLOAD_DIRECTORY / file.filename
-
-    # Save uploaded PDF
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(
-            file.file,
-            buffer
-        )
-
-    # Extract text normally using PyMuPDF
-    try:
-        document_text, ocr_pages = extract_text_with_ocr(
-        file_path
+    file_path = (
+        UPLOAD_DIRECTORY /
+        Path(file.filename).name
     )
+
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(
+                file.file,
+                buffer
+            )
 
     except Exception as error:
         raise HTTPException(
-        status_code=500,
-        detail=f"Document extraction failed: {str(error)}"
-    )
+            status_code=500,
+            detail=f"Failed to save PDF: {str(error)}"
+        )
 
-    used_ocr = ocr_pages > 0
-
-    # If normal extraction produces almost no text,
-    # try OCR instead
-    if len(document_text.strip()) < 50:
-
-        try:
-            document_text = extract_text_with_ocr(
+    try:
+        document_text, ocr_pages = (
+            extract_text_with_ocr(
                 file_path
             )
+        )
 
-            used_ocr = True
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Document extraction failed: {str(error)}"
+        )
 
-        except Exception as error:
-            raise HTTPException(
-                status_code=500,
-                detail=f"OCR failed: {str(error)}"
-            )
-
-    # Make sure some usable text exists
     if not document_text.strip():
         raise HTTPException(
             status_code=422,
             detail="No readable text could be extracted from the PDF."
         )
 
-    # Save extracted text
-    save_text(
-        file_path.stem,
-        document_text
-    )
+    try:
+        save_text(
+            file_path.stem,
+            document_text
+        )
 
-    # Create chunks
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to save extracted text: {str(error)}"
+        )
+
     chunks = chunk_text(
         document_text
     )
@@ -125,10 +130,11 @@ def upload_document(file: UploadFile = File(...)):
             detail="No text chunks could be created."
         )
 
-    # Generate embeddings
     try:
-        embedded_chunks = generate_chunk_embeddings(
-            chunks
+        embedded_chunks = (
+            generate_chunk_embeddings(
+                chunks
+            )
         )
 
     except Exception as error:
@@ -137,19 +143,26 @@ def upload_document(file: UploadFile = File(...)):
             detail=f"Embedding generation failed: {str(error)}"
         )
 
-    # Save embeddings
-    embedding_file = save_embeddings(
-        file_path.stem,
-        embedded_chunks
-    )
+    try:
+        stored_chunks = save_to_chroma(
+            file_path.stem,
+            embedded_chunks
+        )
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"ChromaDB storage failed: {str(error)}"
+        )
 
     return {
-        "message": "File uploaded and processed successfully",
+        "message": "File uploaded and indexed successfully",
         "filename": file.filename,
+        "document_name": file_path.stem,
         "text_length": len(document_text),
         "chunks_created": len(chunks),
-        "embedding_file": str(embedding_file),
-        "ocr_used": used_ocr,
+        "chroma_chunks_stored": stored_chunks,
+        "ocr_used": ocr_pages > 0,
         "ocr_pages": ocr_pages
     }
 
@@ -157,10 +170,14 @@ def upload_document(file: UploadFile = File(...)):
 @app.get("/documents")
 def list_documents():
 
-    documents = [
-        file.stem
-        for file in EMBEDDING_DIRECTORY.glob("*.json")
-    ]
+    try:
+        documents = list_chroma_documents()
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve documents: {str(error)}"
+        )
 
     return {
         "documents": documents
@@ -168,70 +185,95 @@ def list_documents():
 
 
 @app.post("/ask")
-def ask_question(request: QuestionRequest):
+def ask_question(
+    request: QuestionRequest
+):
 
-    # Check whether selected document exists
-    embedding_file = (
-        EMBEDDING_DIRECTORY
-        / f"{request.document_name}.json"
-    )
+    question = request.question.strip()
+    document_name = request.document_name.strip()
 
-    if not embedding_file.exists():
+    if not question:
         raise HTTPException(
-            status_code=404,
-            detail="Selected document was not found."
+            status_code=400,
+            detail="Question cannot be empty."
         )
 
-    # Retrieve relevant chunks
+    if not document_name:
+        raise HTTPException(
+            status_code=400,
+            detail="Document name cannot be empty."
+        )
+
     try:
-        retrieved_chunks = retrieve_chunks(
-            question=request.question,
-            document_name=request.document_name,
-            top_k=3
+        available_documents = (
+            list_chroma_documents()
         )
 
     except Exception as error:
         raise HTTPException(
             status_code=500,
-            detail=f"Document retrieval failed: {str(error)}"
+            detail=f"Failed to access ChromaDB: {str(error)}"
+        )
+
+    if document_name not in available_documents:
+        raise HTTPException(
+            status_code=404,
+            detail="Selected document was not found."
+        )
+
+    try:
+        retrieved_chunks = (
+            retrieve_from_chroma(
+                question=question,
+                document_name=document_name,
+                top_k=2
+            )
+        )
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"ChromaDB retrieval failed: {str(error)}"
         )
 
     if not retrieved_chunks:
         raise HTTPException(
             status_code=404,
-            detail="No relevant information found in the document."
+            detail="No relevant information was found in the selected document."
         )
 
-    # Combine retrieved chunks into context
     context = "\n\n".join(
         chunk["text"]
         for chunk in retrieved_chunks
     )
 
-    # Create prompt for Qwen3
     prompt = f"""
-Answer the QUESTION using only the CONTEXT.
+You are an offline document-based AI assistant.
 
-Return ONLY the final answer.
-Do not explain your reasoning.
-Do not describe what you are doing.
-Do not say "the user asked", "the context says", or similar phrases.
-Do not repeat the question.
-Keep the answer concise.
+Answer the QUESTION using only the provided CONTEXT.
 
-If the answer is not present in the CONTEXT, return exactly:
+Rules:
+1. Use only information available in the CONTEXT.
+2. Do not use outside knowledge.
+3. Do not invent or assume information.
+4. Return only the final answer.
+5. Do not show or explain your reasoning.
+6. Do not mention the context or these instructions.
+7. Answer using complete sentences.
+8. Give enough detail to fully answer the question without unnecessary information.
+9. Prefer 1 to 4 sentences depending on the question.
+10. If the answer is unavailable, return exactly:
 The answer is not available in the uploaded document.
 
 CONTEXT:
 {context}
 
 QUESTION:
-{request.question}
+{question}
 
-FINAL ANSWER ONLY:
+FINAL ANSWER:
 """
 
-    # Send context and question to Qwen3
     try:
         response = chat(
             model=MODEL_NAME,
@@ -254,9 +296,38 @@ FINAL ANSWER ONLY:
             detail=f"AI model failed: {str(error)}"
         )
 
-    final_answer = response.message.content
+    final_answer = (
+        response.message.content or ""
+    ).strip()
 
-    # Handle case where model returns no final answer
+    if not final_answer:
+
+        try:
+            retry_response = chat(
+                model=MODEL_NAME,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                think=True,
+                options={
+                    "num_predict": 4000,
+                    "temperature": 0
+                }
+            )
+
+        except Exception as error:
+            raise HTTPException(
+                status_code=500,
+                detail=f"AI model retry failed: {str(error)}"
+            )
+
+        final_answer = (
+            retry_response.message.content or ""
+        ).strip()
+
     if not final_answer:
         raise HTTPException(
             status_code=500,
@@ -264,9 +335,10 @@ FINAL ANSWER ONLY:
         )
 
     return {
-        "question": request.question,
-        "document": request.document_name,
-        "retrieved_chunks": len(retrieved_chunks),
-        "context": context,
+        "question": question,
+        "document": document_name,
+        "retrieved_chunks": len(
+            retrieved_chunks
+        ),
         "answer": final_answer
     }
