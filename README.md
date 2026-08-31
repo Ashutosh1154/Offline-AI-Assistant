@@ -592,3 +592,9 @@ The final application supports:
 - Fully local document processing without cloud-based AI APIs
 
 **Project Status: Completed ✅**
+
+## Application Interface
+
+The Offline AI Assistant provides a responsive interface for uploading PDFs, selecting indexed documents, asking document-grounded questions, managing chat history, and deleting indexed documents.
+
+![Offline AI Assistant UI](screenshots/offline_ai_ui.jpeg)
