@@ -1,54 +1,113 @@
+// =======================================================
+// ELEMENTS
+// =======================================================
+
 const fileInput =
-    document.getElementById("fileInput");
+    document.getElementById(
+        "fileInput"
+    );
 
 const chooseFileButton =
-    document.getElementById("chooseFileButton");
+    document.getElementById(
+        "chooseFileButton"
+    );
 
 const uploadButton =
-    document.getElementById("uploadButton");
+    document.getElementById(
+        "uploadButton"
+    );
 
 const uploadArea =
-    document.getElementById("uploadArea");
+    document.getElementById(
+        "uploadArea"
+    );
 
 const selectedFile =
-    document.getElementById("selectedFile");
+    document.getElementById(
+        "selectedFile"
+    );
 
 const uploadStatus =
-    document.getElementById("uploadStatus");
+    document.getElementById(
+        "uploadStatus"
+    );
 
 const documentSelect =
-    document.getElementById("documentSelect");
+    document.getElementById(
+        "documentSelect"
+    );
 
 const refreshDocuments =
-    document.getElementById("refreshDocuments");
+    document.getElementById(
+        "refreshDocuments"
+    );
+
+const deleteDocumentButton =
+    document.getElementById(
+        "deleteDocumentButton"
+    );
+
+const documentStatus =
+    document.getElementById(
+        "documentStatus"
+    );
 
 const questionInput =
-    document.getElementById("questionInput");
+    document.getElementById(
+        "questionInput"
+    );
 
 const askButton =
-    document.getElementById("askButton");
-
-const chatContainer =
-    document.getElementById("chatContainer");
-
-const chatPlaceholder =
-    document.getElementById("chatPlaceholder");
+    document.getElementById(
+        "askButton"
+    );
 
 const loadingCard =
-    document.getElementById("loadingCard");
+    document.getElementById(
+        "loadingCard"
+    );
 
 const selectedDocumentLabel =
-    document.getElementById("selectedDocumentLabel");
+    document.getElementById(
+        "selectedDocumentLabel"
+    );
+
+const chatContainer =
+    document.getElementById(
+        "chatContainer"
+    );
+
+const clearChatButton =
+    document.getElementById(
+        "clearChatButton"
+    );
 
 
 let currentFile = null;
 
+let isUploading = false;
+
+let isGenerating = false;
+
+let isDeleting = false;
+
+
+// =======================================================
+// FILE SELECTION
+// =======================================================
 
 chooseFileButton.addEventListener(
     "click",
     (event) => {
 
         event.stopPropagation();
+
+        if (
+            isUploading ||
+            isDeleting
+        ) {
+            return;
+        }
 
         fileInput.click();
     }
@@ -58,6 +117,13 @@ chooseFileButton.addEventListener(
 uploadArea.addEventListener(
     "click",
     () => {
+
+        if (
+            isUploading ||
+            isDeleting
+        ) {
+            return;
+        }
 
         fileInput.click();
     }
@@ -68,20 +134,66 @@ fileInput.addEventListener(
     "change",
     () => {
 
-        if (fileInput.files.length > 0) {
+        if (
+            fileInput.files.length > 0
+        ) {
 
-            currentFile =
-                fileInput.files[0];
-
-            selectedFile.textContent =
-                currentFile.name;
-
-            uploadButton.disabled = false;
+            setSelectedFile(
+                fileInput.files[0]
+            );
         }
-
     }
 );
 
+
+function setSelectedFile(
+    file
+) {
+
+    if (
+        !file.name
+            .toLowerCase()
+            .endsWith(".pdf")
+    ) {
+
+        currentFile = null;
+
+        selectedFile.textContent =
+            "";
+
+        showUploadError(
+            "Please select a PDF file."
+        );
+
+        updateControlStates();
+
+        return;
+    }
+
+
+    currentFile =
+        file;
+
+
+    selectedFile.textContent =
+        file.name;
+
+
+    uploadStatus.textContent =
+        "";
+
+
+    uploadStatus.className =
+        "status-message";
+
+
+    updateControlStates();
+}
+
+
+// =======================================================
+// DRAG AND DROP
+// =======================================================
 
 uploadArea.addEventListener(
     "dragover",
@@ -89,9 +201,16 @@ uploadArea.addEventListener(
 
         event.preventDefault();
 
-        uploadArea.classList.add(
-            "drag-active"
-        );
+
+        if (
+            !isUploading &&
+            !isDeleting
+        ) {
+
+            uploadArea.classList.add(
+                "drag-active"
+            );
+        }
     }
 );
 
@@ -113,26 +232,40 @@ uploadArea.addEventListener(
 
         event.preventDefault();
 
+
         uploadArea.classList.remove(
             "drag-active"
         );
 
+
+        if (
+            isUploading ||
+            isDeleting
+        ) {
+
+            return;
+        }
+
+
         const file =
             event.dataTransfer.files[0];
+
 
         if (!file) {
             return;
         }
 
-        currentFile = file;
 
-        selectedFile.textContent =
-            file.name;
-
-        uploadButton.disabled = false;
+        setSelectedFile(
+            file
+        );
     }
 );
 
+
+// =======================================================
+// UPLOAD DOCUMENT
+// =======================================================
 
 uploadButton.addEventListener(
     "click",
@@ -142,41 +275,37 @@ uploadButton.addEventListener(
 
 async function uploadDocument() {
 
-    if (!currentFile) {
-        return;
-    }
-
     if (
-        !currentFile.name
-            .toLowerCase()
-            .endsWith(".pdf")
+        !currentFile ||
+        isUploading
     ) {
 
-        showUploadError(
-            "Please select a PDF file."
-        );
-
         return;
     }
+
 
     const formData =
         new FormData();
+
 
     formData.append(
         "file",
         currentFile
     );
 
-    uploadButton.disabled = true;
 
-    uploadButton.textContent =
-        "Processing...";
+    setUploadLoading(
+        true
+    );
+
 
     uploadStatus.className =
         "status-message";
 
+
     uploadStatus.textContent =
         "Extracting text, generating embeddings and indexing document...";
+
 
     try {
 
@@ -184,13 +313,18 @@ async function uploadDocument() {
             await fetch(
                 "/upload",
                 {
-                    method: "POST",
-                    body: formData
+                    method:
+                        "POST",
+
+                    body:
+                        formData
                 }
             );
 
+
         const data =
             await response.json();
+
 
         if (!response.ok) {
 
@@ -200,11 +334,26 @@ async function uploadDocument() {
             );
         }
 
+
         uploadStatus.className =
             "status-message success";
 
+
         uploadStatus.textContent =
             `Indexed successfully • ${data.chunks_created} chunks • OCR pages: ${data.ocr_pages}`;
+
+
+        currentFile =
+            null;
+
+
+        fileInput.value =
+            "";
+
+
+        selectedFile.textContent =
+            "";
+
 
         await loadDocuments(
             data.document_name
@@ -217,37 +366,89 @@ async function uploadDocument() {
         showUploadError(
             error.message
         );
-
     }
 
     finally {
 
-        uploadButton.disabled = false;
-
-        uploadButton.textContent =
-            "Upload & Index";
+        setUploadLoading(
+            false
+        );
     }
 }
 
 
-function showUploadError(message) {
+function setUploadLoading(
+    loading
+) {
+
+    isUploading =
+        loading;
+
+
+    if (loading) {
+
+        uploadButton.textContent =
+            "Processing...";
+
+
+        uploadArea.classList.add(
+            "processing"
+        );
+
+    }
+
+    else {
+
+        uploadButton.textContent =
+            "Upload & Index";
+
+
+        uploadArea.classList.remove(
+            "processing"
+        );
+    }
+
+
+    updateControlStates();
+}
+
+
+function showUploadError(
+    message
+) {
 
     uploadStatus.className =
         "status-message error";
+
 
     uploadStatus.textContent =
         message;
 }
 
 
+// =======================================================
+// LOAD DOCUMENTS
+// =======================================================
+
 async function loadDocuments(
     selectedDocument = null
 ) {
 
+    documentSelect.disabled =
+        true;
+
+
+    refreshDocuments.disabled =
+        true;
+
+
     documentSelect.innerHTML =
-        `<option value="">
+        `
+        <option value="">
             Loading documents...
-        </option>`;
+        </option>
+        `;
+
 
     try {
 
@@ -256,8 +457,10 @@ async function loadDocuments(
                 "/documents"
             );
 
+
         const data =
             await response.json();
+
 
         if (!response.ok) {
 
@@ -267,30 +470,54 @@ async function loadDocuments(
             );
         }
 
-        documentSelect.innerHTML = "";
+
+        documentSelect.innerHTML =
+            "";
+
 
         if (
             !data.documents ||
             data.documents.length === 0
         ) {
 
-            documentSelect.innerHTML =
-                `<option value="">
-                    No documents available
-                </option>`;
+            const option =
+                document.createElement(
+                    "option"
+                );
+
+
+            option.value =
+                "";
+
+
+            option.textContent =
+                "No documents available";
+
+
+            documentSelect.appendChild(
+                option
+            );
+
+
+            updateSelectedDocumentLabel();
 
             return;
         }
+
 
         const defaultOption =
             document.createElement(
                 "option"
             );
 
-        defaultOption.value = "";
+
+        defaultOption.value =
+            "";
+
 
         defaultOption.textContent =
             "Select a document";
+
 
         documentSelect.appendChild(
             defaultOption
@@ -305,11 +532,14 @@ async function loadDocuments(
                         "option"
                     );
 
+
                 option.value =
                     documentName;
 
+
                 option.textContent =
                     documentName;
+
 
                 documentSelect.appendChild(
                     option
@@ -318,40 +548,104 @@ async function loadDocuments(
         );
 
 
-        if (selectedDocument) {
+        if (
+            selectedDocument &&
+            data.documents.includes(
+                selectedDocument
+            )
+        ) {
 
             documentSelect.value =
                 selectedDocument;
-
-            updateSelectedDocumentLabel();
         }
+
+
+        updateSelectedDocumentLabel();
 
     }
 
     catch (error) {
 
         documentSelect.innerHTML =
-            `<option value="">
+            `
+            <option value="">
                 Failed to load documents
-            </option>`;
+            </option>
+            `;
 
-        console.error(error);
+
+        documentStatus.className =
+            "status-message error";
+
+
+        documentStatus.textContent =
+            error.message;
+
+    }
+
+    finally {
+
+        documentSelect.disabled =
+            false;
+
+
+        refreshDocuments.disabled =
+            false;
+
+
+        updateControlStates();
     }
 }
 
 
+// =======================================================
+// REFRESH DOCUMENTS
+// =======================================================
+
 refreshDocuments.addEventListener(
     "click",
-    () => {
+    async () => {
 
-        loadDocuments();
+        if (
+            isGenerating ||
+            isDeleting
+        ) {
+
+            return;
+        }
+
+
+        documentStatus.textContent =
+            "";
+
+
+        const currentDocument =
+            documentSelect.value;
+
+
+        await loadDocuments(
+            currentDocument
+        );
     }
 );
 
 
+// =======================================================
+// DOCUMENT SELECTION
+// =======================================================
+
 documentSelect.addEventListener(
     "change",
-    updateSelectedDocumentLabel
+    () => {
+
+        documentStatus.textContent =
+            "";
+
+
+        updateSelectedDocumentLabel();
+
+        updateControlStates();
+    }
 );
 
 
@@ -360,10 +654,12 @@ function updateSelectedDocumentLabel() {
     const documentName =
         documentSelect.value;
 
+
     if (documentName) {
 
         selectedDocumentLabel.textContent =
             `Selected: ${documentName}`;
+
     }
 
     else {
@@ -373,6 +669,134 @@ function updateSelectedDocumentLabel() {
     }
 }
 
+
+// =======================================================
+// DELETE DOCUMENT
+// =======================================================
+
+deleteDocumentButton.addEventListener(
+    "click",
+    deleteSelectedDocument
+);
+
+
+async function deleteSelectedDocument() {
+
+    const documentName =
+        documentSelect.value;
+
+
+    if (
+        !documentName ||
+        isDeleting ||
+        isGenerating
+    ) {
+
+        return;
+    }
+
+
+    const confirmed =
+        window.confirm(
+            `Delete "${documentName}"?\n\nThis will remove the PDF, processed text and ChromaDB embeddings.`
+        );
+
+
+    if (!confirmed) {
+
+        return;
+    }
+
+
+    isDeleting =
+        true;
+
+
+    deleteDocumentButton.textContent =
+        "Deleting...";
+
+
+    documentStatus.className =
+        "status-message";
+
+
+    documentStatus.textContent =
+        "Deleting document...";
+
+
+    updateControlStates();
+
+
+    try {
+
+        const response =
+            await fetch(
+                `/documents/${encodeURIComponent(documentName)}`,
+                {
+                    method:
+                        "DELETE"
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.detail ||
+                "Unable to delete document."
+            );
+        }
+
+
+        documentStatus.className =
+            "status-message success";
+
+
+        documentStatus.textContent =
+            `Deleted "${documentName}" successfully.`;
+
+
+        clearChat();
+
+
+        await loadDocuments();
+
+
+    }
+
+    catch (error) {
+
+        documentStatus.className =
+            "status-message error";
+
+
+        documentStatus.textContent =
+            error.message;
+
+    }
+
+    finally {
+
+        isDeleting =
+            false;
+
+
+        deleteDocumentButton.textContent =
+            "Delete";
+
+
+        updateControlStates();
+    }
+}
+
+
+// =======================================================
+// ASK QUESTION
+// =======================================================
 
 askButton.addEventListener(
     "click",
@@ -391,9 +815,19 @@ questionInput.addEventListener(
 
             event.preventDefault();
 
-            askQuestion();
+
+            if (!isGenerating) {
+
+                askQuestion();
+            }
         }
     }
+);
+
+
+questionInput.addEventListener(
+    "input",
+    updateControlStates
 );
 
 
@@ -402,8 +836,15 @@ async function askQuestion() {
     const question =
         questionInput.value.trim();
 
+
     const documentName =
         documentSelect.value;
+
+
+    if (isGenerating) {
+
+        return;
+    }
 
 
     if (!documentName) {
@@ -428,10 +869,7 @@ async function askQuestion() {
     }
 
 
-    if (chatPlaceholder) {
-
-        chatPlaceholder.remove();
-    }
+    removeChatPlaceholder();
 
 
     showChatMessage(
@@ -440,17 +878,13 @@ async function askQuestion() {
     );
 
 
-    questionInput.value = "";
+    questionInput.value =
+        "";
 
 
-    loadingCard.classList.remove(
-        "hidden"
+    setGeneratingState(
+        true
     );
-
-    askButton.disabled = true;
-
-    askButton.textContent =
-        "Thinking...";
 
 
     try {
@@ -459,22 +893,24 @@ async function askQuestion() {
             await fetch(
                 "/ask",
                 {
-                    method: "POST",
+                    method:
+                        "POST",
 
                     headers: {
                         "Content-Type":
                             "application/json"
                     },
 
-                    body: JSON.stringify(
-                        {
-                            question:
-                                question,
+                    body:
+                        JSON.stringify(
+                            {
+                                question:
+                                    question,
 
-                            document_name:
-                                documentName
-                        }
-                    )
+                                document_name:
+                                    documentName
+                            }
+                        )
                 }
             );
 
@@ -510,26 +946,33 @@ async function askQuestion() {
 
     finally {
 
-        loadingCard.classList.add(
-            "hidden"
+        setGeneratingState(
+            false
         );
 
-        askButton.disabled = false;
-
-        askButton.textContent =
-            "Ask AI";
 
         questionInput.focus();
     }
 }
+
+
+// =======================================================
+// CHAT MESSAGE
+// =======================================================
 
 function showChatMessage(
     role,
     message
 ) {
 
+    removeChatPlaceholder();
+
+
     const messageWrapper =
-        document.createElement("div");
+        document.createElement(
+            "div"
+        );
+
 
     messageWrapper.classList.add(
         "chat-message",
@@ -538,7 +981,10 @@ function showChatMessage(
 
 
     const messageBubble =
-        document.createElement("div");
+        document.createElement(
+            "div"
+        );
+
 
     messageBubble.classList.add(
         "message-bubble"
@@ -546,29 +992,27 @@ function showChatMessage(
 
 
     const messageLabel =
-        document.createElement("div");
+        document.createElement(
+            "div"
+        );
+
 
     messageLabel.classList.add(
         "message-label"
     );
 
 
-    if (role === "user") {
-
-        messageLabel.textContent =
-            "You";
-
-    }
-
-    else {
-
-        messageLabel.textContent =
-            "AI Assistant";
-    }
+    messageLabel.textContent =
+        role === "user"
+            ? "You"
+            : "AI Assistant";
 
 
     const messageText =
-        document.createElement("p");
+        document.createElement(
+            "p"
+        );
+
 
     messageText.textContent =
         message;
@@ -578,13 +1022,16 @@ function showChatMessage(
         messageLabel
     );
 
+
     messageBubble.appendChild(
         messageText
     );
 
+
     messageWrapper.appendChild(
         messageBubble
     );
+
 
     chatContainer.appendChild(
         messageWrapper
@@ -595,17 +1042,213 @@ function showChatMessage(
         chatContainer.scrollHeight;
 }
 
-function escapeHtml(text) {
 
-    const element =
-        document.createElement(
-            "div"
+// =======================================================
+// GENERATING STATE
+// =======================================================
+
+function setGeneratingState(
+    generating
+) {
+
+    isGenerating =
+        generating;
+
+
+    if (generating) {
+
+        loadingCard.classList.remove(
+            "hidden"
         );
 
-    element.textContent = text;
 
-    return element.innerHTML;
+        askButton.textContent =
+            "Thinking...";
+
+    }
+
+    else {
+
+        loadingCard.classList.add(
+            "hidden"
+        );
+
+
+        askButton.textContent =
+            "Ask AI";
+    }
+
+
+    updateControlStates();
 }
 
+
+// =======================================================
+// CONTROL STATES
+// =======================================================
+
+function updateControlStates() {
+
+    const hasDocument =
+        Boolean(
+            documentSelect.value
+        );
+
+
+    const hasQuestion =
+        Boolean(
+            questionInput.value.trim()
+        );
+
+
+    uploadButton.disabled =
+        (
+            !currentFile ||
+            isUploading ||
+            isGenerating ||
+            isDeleting
+        );
+
+
+    chooseFileButton.disabled =
+        (
+            isUploading ||
+            isGenerating ||
+            isDeleting
+        );
+
+
+    fileInput.disabled =
+        (
+            isUploading ||
+            isGenerating ||
+            isDeleting
+        );
+
+
+    askButton.disabled =
+        (
+            !hasDocument ||
+            !hasQuestion ||
+            isGenerating ||
+            isUploading ||
+            isDeleting
+        );
+
+
+    deleteDocumentButton.disabled =
+        (
+            !hasDocument ||
+            isGenerating ||
+            isUploading ||
+            isDeleting
+        );
+
+
+    documentSelect.disabled =
+        (
+            isGenerating ||
+            isUploading ||
+            isDeleting
+        );
+
+
+    refreshDocuments.disabled =
+        (
+            isGenerating ||
+            isUploading ||
+            isDeleting
+        );
+
+
+    clearChatButton.disabled =
+        (
+            isGenerating ||
+            isDeleting
+        );
+
+
+    questionInput.disabled =
+        (
+            isGenerating ||
+            isDeleting
+        );
+}
+
+
+// =======================================================
+// CLEAR CHAT
+// =======================================================
+
+clearChatButton.addEventListener(
+    "click",
+    clearChat
+);
+
+
+function clearChat() {
+
+    if (isGenerating) {
+
+        return;
+    }
+
+
+    chatContainer.innerHTML =
+        `
+        <div
+            class="chat-placeholder"
+            id="chatPlaceholder"
+        >
+
+            <div class="assistant-avatar">
+                AI
+            </div>
+
+            <h3>
+                Start a conversation
+            </h3>
+
+            <p>
+                Select a document and ask a question.
+                Your conversation will appear here.
+            </p>
+
+        </div>
+        `;
+
+
+    questionInput.value =
+        "";
+
+
+    updateControlStates();
+
+
+    if (!questionInput.disabled) {
+
+        questionInput.focus();
+    }
+}
+
+
+function removeChatPlaceholder() {
+
+    const placeholder =
+        document.getElementById(
+            "chatPlaceholder"
+        );
+
+
+    if (placeholder) {
+
+        placeholder.remove();
+    }
+}
+
+
+// =======================================================
+// INITIAL LOAD
+// =======================================================
 
 loadDocuments();

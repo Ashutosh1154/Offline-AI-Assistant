@@ -2,6 +2,7 @@
 <html lang="en">
 
 <head>
+
     <meta charset="UTF-8">
 
     <meta
@@ -9,314 +10,349 @@
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>Offline AI Assistant</title>
+    <title>
+        Offline AI Assistant
+    </title>
 
     <link
         rel="stylesheet"
         href="/static/style.css"
     >
+
 </head>
 
 
 <body>
 
-    <header class="topbar">
 
-        <div class="brand">
+<header class="topbar">
 
-            <div class="logo">
-                AI
-            </div>
+    <div class="brand">
 
-            <div>
-                <h1>Offline AI Assistant</h1>
+        <div class="logo">
+            AI
+        </div>
+
+        <div>
+
+            <h1>
+                Offline AI Assistant
+            </h1>
+
+            <p>
+                Private document intelligence powered locally
+            </p>
+
+        </div>
+
+    </div>
+
+
+    <div class="status-badge">
+
+        <span class="status-dot"></span>
+
+        Qwen3:4B • Offline
+
+    </div>
+
+</header>
+
+
+
+<main class="main-container">
+
+
+    <!-- ================================= -->
+    <!-- SIDEBAR -->
+    <!-- ================================= -->
+
+    <section class="sidebar">
+
+
+        <!-- UPLOAD DOCUMENT -->
+
+        <div class="card">
+
+            <div class="section-header">
+
+                <h2>
+                    Upload Document
+                </h2>
 
                 <p>
-                    Private document intelligence powered locally
+                    Add a PDF to your local knowledge base.
                 </p>
+
             </div>
 
-        </div>
 
+            <div
+                class="upload-area"
+                id="uploadArea"
+            >
 
-        <div class="status-badge">
-
-            <span class="status-dot"></span>
-
-            Qwen3:4B • Offline
-
-        </div>
-
-    </header>
-
-
-    <main class="main-container">
-
-
-        <!-- ============================= -->
-        <!-- LEFT SIDEBAR -->
-        <!-- ============================= -->
-
-        <section class="sidebar">
-
-
-            <!-- UPLOAD DOCUMENT CARD -->
-
-            <div class="card">
-
-                <div class="section-header">
-
-                    <h2>Upload Document</h2>
-
-                    <p>
-                        Add a PDF to your local knowledge base.
-                    </p>
-
+                <div class="upload-icon">
+                    ↑
                 </div>
 
+                <h3>
+                    Upload PDF
+                </h3>
 
-                <div
-                    class="upload-area"
-                    id="uploadArea"
+                <p>
+                    Drag and drop your PDF here
+                    or choose a file.
+                </p>
+
+
+                <input
+                    type="file"
+                    id="fileInput"
+                    accept=".pdf"
+                    hidden
                 >
-
-                    <div class="upload-icon">
-                        ↑
-                    </div>
-
-                    <h3>
-                        Upload PDF
-                    </h3>
-
-                    <p>
-                        Drag and drop your PDF here
-                        or choose a file.
-                    </p>
-
-
-                    <input
-                        type="file"
-                        id="fileInput"
-                        accept=".pdf"
-                        hidden
-                    >
-
-
-                    <button
-                        class="secondary-button"
-                        id="chooseFileButton"
-                    >
-                        Choose File
-                    </button>
-
-
-                    <p
-                        class="selected-file"
-                        id="selectedFile"
-                    >
-                    </p>
-
-                </div>
 
 
                 <button
-                    class="primary-button"
-                    id="uploadButton"
-                    disabled
+                    class="secondary-button"
+                    id="chooseFileButton"
                 >
-                    Upload & Index
+                    Choose File
                 </button>
 
 
-                <div
-                    class="status-message"
-                    id="uploadStatus"
-                >
-                </div>
+                <p
+                    class="selected-file"
+                    id="selectedFile"
+                ></p>
 
             </div>
 
 
-            <!-- DOCUMENT SELECTION CARD -->
-
-            <div class="card">
-
-                <div class="section-header">
-
-                    <h2>
-                        Document
-                    </h2>
-
-                    <p>
-                        Select the document you want to query.
-                    </p>
-
-                </div>
+            <button
+                class="primary-button"
+                id="uploadButton"
+                disabled
+            >
+                Upload & Index
+            </button>
 
 
-                <select id="documentSelect">
+            <div
+                class="status-message"
+                id="uploadStatus"
+            ></div>
 
-                    <option value="">
-                        Loading documents...
-                    </option>
+        </div>
 
-                </select>
 
+
+        <!-- DOCUMENT MANAGEMENT -->
+
+        <div class="card">
+
+            <div class="section-header">
+
+                <h2>
+                    Documents
+                </h2>
+
+                <p>
+                    Select an indexed PDF to query.
+                </p>
+
+            </div>
+
+
+            <select
+                id="documentSelect"
+            >
+
+                <option value="">
+                    Loading documents...
+                </option>
+
+            </select>
+
+
+            <div class="document-actions">
 
                 <button
                     class="refresh-button"
                     id="refreshDocuments"
                 >
-                    ↻ Refresh Documents
+                    ↻ Refresh
+                </button>
+
+
+                <button
+                    class="delete-button"
+                    id="deleteDocumentButton"
+                    disabled
+                >
+                    Delete
                 </button>
 
             </div>
 
-        </section>
-
-
-
-        <!-- ============================= -->
-        <!-- MAIN WORKSPACE -->
-        <!-- ============================= -->
-
-        <section class="workspace">
-
-
-            <!-- WORKSPACE HEADER -->
-
-            <div class="workspace-header">
-
-                <div>
-
-                    <h2>
-                        Ask your document
-                    </h2>
-
-                    <p>
-                        Ask questions and get answers grounded
-                        only in the selected PDF.
-                    </p>
-
-                </div>
-
-            </div>
-
-
-
-            <!-- QUESTION INPUT -->
-
-            <div class="question-card">
-
-                <textarea
-                    id="questionInput"
-                    placeholder="Ask a question about your selected document..."
-                    rows="4"
-                ></textarea>
-
-
-                <div class="question-footer">
-
-                    <span id="selectedDocumentLabel">
-                        No document selected
-                    </span>
-
-
-                    <button
-                        class="ask-button"
-                        id="askButton"
-                    >
-                        Ask AI
-                    </button>
-
-                </div>
-
-            </div>
-
-
-
-            <!-- LOADING INDICATOR -->
 
             <div
-                class="loading-card hidden"
-                id="loadingCard"
-            >
+                class="status-message"
+                id="documentStatus"
+            ></div>
 
-                <div class="spinner"></div>
+        </div>
+
+    </section>
 
 
-                <div>
 
-                    <strong>
-                        Generating answer...
-                    </strong>
+    <!-- ================================= -->
+    <!-- WORKSPACE -->
+    <!-- ================================= -->
 
-                    <p>
-                        Searching the document and running
-                        Qwen3 locally.
-                    </p>
+    <section class="workspace">
 
-                </div>
+
+        <div class="workspace-header">
+
+            <div>
+
+                <h2>
+                    Ask your document
+                </h2>
+
+                <p>
+                    Ask questions and get answers grounded
+                    only in the selected PDF.
+                </p>
 
             </div>
 
 
-
-            <!-- ============================= -->
-            <!-- CHAT HISTORY -->
-            <!-- ============================= -->
-
-            <div
-                class="chat-container"
-                id="chatContainer"
+            <button
+                class="clear-chat-button"
+                id="clearChatButton"
             >
+                Clear Chat
+            </button>
 
-                <div
-                    class="chat-placeholder"
-                    id="chatPlaceholder"
+        </div>
+
+
+
+        <!-- QUESTION INPUT -->
+
+        <div class="question-card">
+
+            <textarea
+                id="questionInput"
+                placeholder="Ask a question about your selected document..."
+                rows="4"
+            ></textarea>
+
+
+            <div class="question-footer">
+
+                <span
+                    id="selectedDocumentLabel"
                 >
-
-                    <div class="assistant-avatar">
-                        AI
-                    </div>
+                    No document selected
+                </span>
 
 
-                    <h3>
-                        Start a conversation
-                    </h3>
-
-
-                    <p>
-                        Select a document and ask a question.
-                        Your conversation will appear here.
-                    </p>
-
-                </div>
+                <button
+                    class="ask-button"
+                    id="askButton"
+                    disabled
+                >
+                    Ask AI
+                </button>
 
             </div>
 
-
-        </section>
-
-    </main>
+        </div>
 
 
 
-    <!-- ============================= -->
-    <!-- FOOTER -->
-    <!-- ============================= -->
+        <!-- AI LOADING -->
 
-    <footer>
+        <div
+            class="loading-card hidden"
+            id="loadingCard"
+        >
 
-        Offline AI Assistant
-        • Local RAG
-        • ChromaDB
-        • Qwen3:4B
+            <div class="spinner"></div>
 
-    </footer>
+            <div>
+
+                <strong>
+                    Generating answer...
+                </strong>
+
+                <p>
+                    Searching the document and running
+                    Qwen3 locally.
+                </p>
+
+            </div>
+
+        </div>
 
 
-    <script src="/static/script.js"></script>
+
+        <!-- CHAT HISTORY -->
+
+        <div
+            class="chat-container"
+            id="chatContainer"
+        >
+
+            <div
+                class="chat-placeholder"
+                id="chatPlaceholder"
+            >
+
+                <div class="assistant-avatar">
+                    AI
+                </div>
+
+
+                <h3>
+                    Start a conversation
+                </h3>
+
+
+                <p>
+                    Select a document and ask a question.
+                    Your conversation will appear here.
+                </p>
+
+            </div>
+
+        </div>
+
+    </section>
+
+</main>
+
+
+
+<footer>
+
+    Offline AI Assistant
+    • Local RAG
+    • ChromaDB
+    • Qwen3:4B
+
+</footer>
+
+
+<script
+    src="/static/script.js"
+></script>
+
 
 </body>
 

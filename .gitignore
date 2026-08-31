@@ -1,21 +1,24 @@
-
-# Python cache
 __pycache__/
-*.pyc
+*.py[cod]
 
-# Virtual Environment
 .venv/
+venv/
 
-# Processed data
-data/processed/
-
-# Uploaded files
-data/uploads/
-
-# Chroma Vector Database (later)
-data/chroma_db/
-
-# Environment variables (later)
 .env
+.env.*
+
+data/uploads/*
+data/processed/*
+data/chroma_db/*
+data/embeddings/*
+
+!data/uploads/.gitkeep
+!data/processed/.gitkeep
 
 *.save
+
+.vscode/
+.idea/
+
+.DS_Store
+Thumbs.db
